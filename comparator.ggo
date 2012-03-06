@@ -1,0 +1,17 @@
+# Name of your program
+package "comparator"
+purpose "compare outputs of barriers and RNAlocmin"
+
+# Version of your program
+version "0.1"   # don't use version if you're using automake
+
+# command line options passed to gengetopt
+args "--file-name=comparator_cmdline --include-getopt --default-optional --unamed-opts"
+
+# Options
+option "barriers"           b "barriers file" string default="barriers.out"
+option "rnalocmin"          l "RNAlocmin file" string default="rnalocmin.out"
+option "open_barr"          - "Returns open chain number in barriers" flag off
+option "open_loc"           - "Returns open chain number in RNAlocmin" flag off
+option "output"             o "Output file name (default to stdout)" string no
+option "verbose"            v "Display more things" flag off
