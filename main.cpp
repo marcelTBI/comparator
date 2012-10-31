@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include <string>
 #include <map>
@@ -36,8 +37,14 @@ struct locstruct {
   float energy;
   int many;         // how many walks ended here
 
+  bool operator<(const locstruct &second) const {
+    return num<second.num;
+  }
+
 } _locstruct;
 
+
+// parse loc file!
 int Parsefile (FILE *fp, map<string, locstruct > &mapping)
 {
   char *line = NULL, *p, sep[] = " ";
@@ -79,11 +86,26 @@ int main(int argc, char **argv)
   FILE *rnaloc;
   FILE *output;
 
-  barrier = fopen(args_info.barriers_arg, "r");
-  if (barrier==NULL) {
-    fprintf(stderr, "Cannot open file %s\n", args_info.barriers_arg);
-    exit(EXIT_FAILURE);
+  bool barrier_file;
+
+
+  // standard or barrier?
+  if (args_info.standard_given) {
+    barrier_file = false;
+    barrier = fopen(args_info.standard_arg, "r");
+    if (barrier==NULL) {
+      fprintf(stderr, "Cannot open file %s\n", args_info.standard_arg);
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    barrier = fopen(args_info.barriers_arg, "r");
+    barrier_file = true;
+    if (barrier==NULL) {
+      fprintf(stderr, "Cannot open file %s\n", args_info.barriers_arg);
+      exit(EXIT_FAILURE);
+    }
   }
+
   rnaloc = fopen(args_info.rnalocmin_arg, "r");
   if (rnaloc==NULL) {
     fprintf(stderr, "Cannot open file %s\n", args_info.rnalocmin_arg);
@@ -126,11 +148,19 @@ int main(int argc, char **argv)
   fprintf(output, "N.(barriers) N.(locmin) %s energy    Bsize FatherBS Grad.BS #Walks  BS/W GBS/W\n", line+5);
   free(line); line=NULL;
 
-  // basin statistics
+  // basin statistics for missing LM
+  int BSmiss = 0;
+  int FBSmiss = 0;
+  int GRBSmiss = 0;
+  int BScountmiss = 0;
+
+  // also basin statistics for barr
   int BSall = 0;
-  int FBSall = 0;
   int GRBSall = 0;
-  int BScount = 0;
+  int FBSall = 0;
+
+  // also minimal energy
+  float min_energy = INT_MAX;
 
   // structures
   for (count = 0, line = my_getline(barrier); line != NULL; count++, line = my_getline(barrier)) {
@@ -144,6 +174,8 @@ int main(int argc, char **argv)
     float energy;
     sscanf(p, "%f", &energy);
 
+    min_energy = min(min_energy, energy);
+
     int father;
     float en_diff;
     int bsize=0;          /* # of structures in this lmin  == basin size */
@@ -156,13 +188,17 @@ int main(int argc, char **argv)
     int Gr_bsize=0;       /* gradient basin size */
     double FGr;            /* F of gradient basin */
 
-    p = strtok(NULL, sep); sscanf(p, "%d", &father);
-    p = strtok(NULL, sep); sscanf(p, "%f", &en_diff);
-    p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%d", &bsize);
-    p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%d", &fathers_bsize);
-    p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%lf", &F);
-    p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%d", &Gr_bsize);
-    p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%lf", &FGr);}}}}}
+    if (barrier_file) {
+      p = strtok(NULL, sep); sscanf(p, "%d", &father);
+      p = strtok(NULL, sep); sscanf(p, "%f", &en_diff);
+      p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%d", &bsize);
+      p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%d", &fathers_bsize);
+      p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%lf", &F);
+      p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%d", &Gr_bsize);
+      p = strtok(NULL, sep); if (p!=NULL) {sscanf(p, "%lf", &FGr);}}}}}
+    } else {
+      p = strtok(NULL, sep); sscanf(p, "%d", &Gr_bsize);
+    }
 
     map<string, locstruct >::iterator it;
     it=map_loc.find(str);
@@ -185,7 +221,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "WARNING: energies does not agree (%f != %f @ %d)\n", it->second.energy, energy, count);
       }
       loc_mins--;
-      if (bsize==0) {
+      if (Gr_bsize==0) {
         fprintf(output, "%12d %10d %s %6.2f\n",
                 number, it->second.num, str.c_str(), energy);
       } else {
@@ -195,15 +231,22 @@ int main(int argc, char **argv)
       map_loc.erase(it);
     } else {
       if (first_nfound<0) first_nfound = count;
-      if (bsize==0) {
+      if (Gr_bsize==0) {
         fprintf(output, "%12d            %s %6.2f\n", number, str.c_str(), energy);
       } else {
-        BSall += bsize;
-        FBSall += fathers_bsize;
-        GRBSall += Gr_bsize;
-        BScount++;
+        BSmiss += bsize;
+        FBSmiss += fathers_bsize;
+        GRBSmiss += Gr_bsize;
+        BScountmiss++;
         fprintf(output, "%12d            %s %6.2f %8d %8d %7d\n", number, str.c_str(), energy, bsize, fathers_bsize, Gr_bsize);
       }
+    }
+
+    // statistics about all
+    if (Gr_bsize!=0) {
+      BSall+=bsize;
+      GRBSall+=Gr_bsize;
+      FBSall+=fathers_bsize;
     }
 
     if (line != NULL) free(line);
@@ -211,11 +254,15 @@ int main(int argc, char **argv)
   if (line != NULL) free(line);
 
   // display basin statistics
-  if (BSall != 0) {
+  if (GRBSmiss != 0) {
     for (int i=0; i<13+13+len+8-24-4;i++) fprintf(output, " ");
-    fprintf(output, "%3d total missing basins: %8d %8d %7d\n", BScount, BSall, FBSall, GRBSall);
+    fprintf(output, "%3d total missing basins: %8d %8d %7d\n", BScountmiss, BSmiss, FBSmiss, GRBSmiss);
     for (int i=0; i<13+13+len+8-24-4;i++) fprintf(output, " ");
-    fprintf(output, "  average missing basins: %8.2lf %8.2lf %7.2lf\n", BSall/(double)BScount, FBSall/(double)BScount, GRBSall/(double)BScount);
+    fprintf(output, "  average missing basins: %8.2lf %8.2lf %7.2lf\n", BSmiss/(double)BScountmiss, FBSmiss/(double)BScountmiss, GRBSmiss/(double)BScountmiss);
+    for (int i=0; i<13+13+len+8-24-4;i++) fprintf(output, " ");
+    fprintf(output, "  total           basins: %8d %8d %7d\n", BSall, FBSall, GRBSall);
+    for (int i=0; i<13+13+len+8-24-4;i++) fprintf(output, " ");
+    fprintf(output, "  percent missing basins: %8.2lf%% %7.2lf%% %6.2lf%%\n", BSmiss/(double)BSall*100.0, FBSmiss/(double)FBSall*100.0, GRBSmiss/(double)GRBSall*100.0);
   }
 
   if (loc_mins!=0) {
@@ -223,14 +270,14 @@ int main(int argc, char **argv)
     //fprintf(stderr, "WARNING: %d local minima have not been found by barriers\n", loc_mins);
 
     // sort 'em in vector and print
-    vector<pair<int, string> > out;
+    vector<pair<locstruct, string> > out;
     for (map<string, locstruct >::iterator it=map_loc.begin(); it!=map_loc.end(); it++) {
-      out.push_back(make_pair(it->second.num, it->first));
+      out.push_back(make_pair(it->second, it->first));
       //fprintf(output, "             %10d %s %6.2f\n", it->second.first, it->first.c_str(), it->second.second);
     }
     sort(out.begin(), out.end());
     for (unsigned int i=0; i<out.size(); i++) {
-      fprintf(output, "             %10d %s %6.2f\n", out[i].first, out[i].second.c_str(), map_loc[out[i].second].energy);
+      fprintf(output, "             %10d %s %6.2f %8d\n", out[i].first.num, out[i].second.c_str(), out[i].first.energy, out[i].first.many);
     }
   }
 
@@ -248,8 +295,17 @@ int main(int argc, char **argv)
       fprintf(stderr, "WARNING: barriers haven\'t found open chain!\n");
   }
 
-  // print two numbers: num of found minima + number of first not found minimum
-  printf("%3d %3d\n", first_nfound+1, last_found);
+  // print 3 numbers: num of found minima + number of first not found minimum + percent of missed Gr basins
+  printf("%3d %3d %5.2f %7.2f\n", first_nfound+1, last_found, GRBSmiss/(double)GRBSall*100.0, min_energy);
+
+  // output percent of missing basins to another file
+  if (args_info.output_basin_given) {
+    FILE *fil = fopen(args_info.output_basin_arg, "w");
+
+    fprintf(fil, "%.2f\n", GRBSmiss/(double)GRBSall*100.0);
+
+    fclose(fil);
+  }
 
   fclose(output);
   fclose(barrier);
