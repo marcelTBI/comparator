@@ -12,6 +12,7 @@ args "--file-name=comparator_cmdline --include-getopt --default-optional --uname
 option "barriers"           b "barriers file" string default="barriers.out"
 option "rnalocmin"          l "RNAlocmin file" string default="rnalocmin.out"
 option "standard"           s "RNAlocmin file as standard to comparison (you have to provide either barrier file or this file)" string no
+option "erange"             e "Compare only minima erange from MFE" double default="1e10" no
 option "open_barr"          - "Returns open chain number in barriers" flag off
 option "open_loc"           - "Returns open chain number in RNAlocmin" flag off
 option "output"             o "Output file name (default to stdout)" string no
