@@ -37,6 +37,8 @@ struct locstruct {
   int num;
   float energy;
   int many;         // how many walks ended here
+  int father;
+  float e_diff;
 
   bool operator<(const locstruct &second) const {
     return num<second.num;
@@ -64,8 +66,22 @@ int Parsefile (FILE *fp, map<string, locstruct > &mapping)
     p = strtok(NULL, sep);
     sscanf(p, "%f",  &l.energy);
     p = strtok(NULL, sep);
-    if (p!=NULL) sscanf(p, "%d",  &l.many);
-    else l.many = -1;
+    if (p!=NULL) {
+      sscanf(p, "%d",  &l.father);
+      p = strtok(NULL, sep);
+      if (p!=NULL) {
+        sscanf(p, "%f",  &l.e_diff);
+        p = strtok(NULL, sep);
+        if (p!=NULL) {
+          sscanf(p, "%d",  &l.many);
+        } else l.many = -1;
+      } else {
+        l.e_diff = 0.0;
+        l.many = l.father;
+        l.father = -1; // case when we dont have father info
+      }
+    } else l.father = -1; // should never happen
+
     mapping.insert(make_pair(str, l));
     if (line != NULL) free(line);
   }
@@ -310,8 +326,8 @@ int main(int argc, char **argv)
       fprintf(stderr, "WARNING: barriers haven\'t found open chain!\n");
   }
 
-  // print 5 numbers: num of found minima + number of first not found minimum + percent of missed Gr basins, mfe, missed fgr
-  printf("%3d %3d %5.2f %7.2f %5.2f\n", first_nfound+1, num_found, GRBSmiss/(double)GRBSall*100.0, min_energy, FGRmiss/FGRall*100.0);
+  // print 6 numbers: number of first not found minimum + num of found minima + percent of missed Gr basins, mfe, missed fgr, number of LM
+  printf("%3d %3d %5.2f %7.2f %5.2f %3d\n", first_nfound+1, num_found, GRBSmiss/(double)GRBSall*100.0, min_energy, FGRmiss/FGRall*100.0, count);
 
   // output percent of missing basins to another file
   if (args_info.output_basin_given) {
