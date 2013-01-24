@@ -310,8 +310,8 @@ int main(int argc, char **argv)
       fprintf(stderr, "WARNING: barriers haven\'t found open chain!\n");
   }
 
-  // print 5 numbers: num of found minima + number of first not found minimum + percent of missed Gr basins, mfe, missed fgr
-  printf("%3d %3d %5.2f %7.2f %5.2f\n", first_nfound+1, num_found, GRBSmiss/(double)GRBSall*100.0, min_energy, FGRmiss/FGRall*100.0);
+  // print 6 numbers: number of first not found minimum + num of found minima + percent of missed Gr basins, mfe, missed fgr, number of LM
+  printf("%3d %3d %5.2f %7.2f %5.2f %3d\n", first_nfound+1, num_found, GRBSmiss/(double)GRBSall*100.0, min_energy, FGRmiss/FGRall*100.0, count);
 
   // output percent of missing basins to another file
   if (args_info.output_basin_given) {
