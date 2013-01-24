@@ -37,6 +37,8 @@ struct locstruct {
   int num;
   float energy;
   int many;         // how many walks ended here
+  int father;
+  float e_diff;
 
   bool operator<(const locstruct &second) const {
     return num<second.num;
@@ -64,8 +66,22 @@ int Parsefile (FILE *fp, map<string, locstruct > &mapping)
     p = strtok(NULL, sep);
     sscanf(p, "%f",  &l.energy);
     p = strtok(NULL, sep);
-    if (p!=NULL) sscanf(p, "%d",  &l.many);
-    else l.many = -1;
+    if (p!=NULL) {
+      sscanf(p, "%d",  &l.father);
+      p = strtok(NULL, sep);
+      if (p!=NULL) {
+        sscanf(p, "%f",  &l.e_diff);
+        p = strtok(NULL, sep);
+        if (p!=NULL) {
+          sscanf(p, "%d",  &l.many);
+        } else l.many = -1;
+      } else {
+        l.e_diff = 0.0;
+        l.many = l.father;
+        l.father = -1; // case when we dont have father info
+      }
+    } else l.father = -1; // should never happen
+
     mapping.insert(make_pair(str, l));
     if (line != NULL) free(line);
   }
